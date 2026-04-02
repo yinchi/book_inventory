@@ -30,8 +30,8 @@ CREATE TABLE IF NOT EXISTS books (
     subtitle TEXT,
     authors TEXT,
     year INTEGER NOT NULL,
-    is_hardcover BOOLEAN,
-    is_hk_related BOOLEAN,
+    is_hardcover BOOLEAN NOT NULL,
+    is_hk_related BOOLEAN NOT NULL,
     notes TEXT
 )"""
 
