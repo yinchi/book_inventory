@@ -169,10 +169,19 @@ def add(isbn: int) -> None:
 
     url = f"https://openlibrary.org/search.json?isbn={isbn}"
     console.print(f"Fetching book data for ISBN {isbn} from Open Library...")
-    response = requests.get(url, timeout=60)
+
+    response = None
     book_info = {}
     book_found = False
-    if response.status_code != 200:
+
+    try:
+        response = requests.get(url, timeout=60)
+    except requests.Timeout as e:
+        console.print(fmt.error(f"Request timed out."))
+    except requests.RequestException as e:
+        console.print(fmt.error(f"An error occurred while fetching book data: {e}"))
+
+    if response is None or response.status_code != 200:
         console.print(fmt.warning(f"Failed to fetch book data for ISBN {isbn}."))
     else:
         data = response.json()
