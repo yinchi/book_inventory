@@ -31,12 +31,13 @@ CREATE TABLE IF NOT EXISTS books (
     authors TEXT,
     year INTEGER NOT NULL,
     is_hardcover BOOLEAN,
+    is_hk_related BOOLEAN,
     notes TEXT
 )"""
 
 SQL_BOOKS_INSERT = """\
-INSERT INTO books (isbn13, title, subtitle, authors, year, is_hardcover, notes)
-VALUES (?, ?, ?, ?, ?, ?, ?)"""
+INSERT INTO books (isbn13, title, subtitle, authors, year, is_hardcover, is_hk_related, notes)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?)"""
 
 
 def insert_book(
@@ -46,19 +47,29 @@ def insert_book(
     authors: list[str],
     year: int,
     is_hardcover: bool,
+    is_hk_related: bool,
     notes: str | None = None,
 ) -> None:
     with sqlite3.connect("books.db") as conn:
         cursor = conn.cursor()
         cursor.execute(
             SQL_BOOKS_INSERT,
-            (isbn13, title, subtitle, "; ".join(authors), year, is_hardcover, notes),
+            (
+                isbn13,
+                title,
+                subtitle,
+                "; ".join(authors),
+                year,
+                is_hardcover,
+                is_hk_related,
+                notes,
+            ),
         )
         conn.commit()
 
 
 def show_single_book(
-    isbn13, title, subtitle, authors_str, year, is_hardcover, notes
+    isbn13, title, subtitle, authors_str, year, is_hardcover, is_hk_related, notes
 ) -> None:
     authors = authors_str.split("; ") if authors_str else []
     console.print(f"Book details for ISBN13 {isbn13}:")
@@ -71,6 +82,7 @@ def show_single_book(
     table.add_row("Author(s)", "\n".join(authors))
     table.add_row("Publication Year", str(year))
     table.add_row("Hardcover", "Yes" if is_hardcover else "No")
+    table.add_row("Hong Kong Related", "Yes" if is_hk_related else "No")
     table.add_row("Notes", notes or "")
     console.print(table)
 
@@ -156,7 +168,7 @@ def add(isbn: int) -> None:
     with sqlite3.connect("books.db") as conn:
         cursor = conn.cursor()
         cursor.execute(
-            "SELECT isbn13, title, subtitle, authors, year, is_hardcover, notes "
+            "SELECT isbn13, title, subtitle, authors, year, is_hardcover, is_hk_related, notes "
             "FROM books WHERE isbn13 = ?",
             (isbn,),
         )
@@ -256,7 +268,11 @@ def add(isbn: int) -> None:
     is_hardcover = Confirm.ask(
         "Is the book a hardcover edition?", console=console, default=False
     )
+    is_hk_related = Confirm.ask(
+        "Is the book related to Hong Kong?", console=console, default=False
+    )
     book_info["is_hardcover"] = is_hardcover
+    book_info["is_hk_related"] = is_hk_related
 
     # Print the collected book information for confirmation
     console.print("\nCollected Book Information:")
@@ -267,6 +283,7 @@ def add(isbn: int) -> None:
         authors_str="; ".join(book_info["authors"]),
         year=book_info["year"],
         is_hardcover=book_info["is_hardcover"],
+        is_hk_related=book_info["is_hk_related"],
         notes=book_info.get("notes"),
     )
 
@@ -286,6 +303,7 @@ def add(isbn: int) -> None:
         authors=book_info["authors"],
         year=book_info["year"],
         is_hardcover=book_info["is_hardcover"],
+        is_hk_related=book_info["is_hk_related"],
         notes=book_info.get("notes"),
     )
 
@@ -326,7 +344,7 @@ def list(format: str, order: str, desc: bool) -> None:
 
         # Omit notes field in the listing for brevity, but it can be added if needed
         cursor.execute(
-            f"SELECT isbn13, title, subtitle, authors, year, is_hardcover "
+            f"SELECT isbn13, title, subtitle, authors, year, is_hardcover, is_hk_related "
             f"FROM books ORDER BY {order_by} {'DESC' if desc else 'ASC'}"
         )
         books = cursor.fetchall()
@@ -342,8 +360,17 @@ def list(format: str, order: str, desc: bool) -> None:
             table.add_column("Author(s)", style="yellow")
             table.add_column("Year", style="green")
             table.add_column("Hardcover", style="red")
+            table.add_column("Hong Kong Related", style="blue")
 
-            for isbn13, title, subtitle, authors_str, year, is_hardcover in books:
+            for (
+                isbn13,
+                title,
+                subtitle,
+                authors_str,
+                year,
+                is_hardcover,
+                is_hk_related,
+            ) in books:
                 table.add_row(
                     str(isbn13),
                     title,
@@ -351,13 +378,22 @@ def list(format: str, order: str, desc: bool) -> None:
                     authors_str,
                     str(year) if year is not None else "",
                     "Yes" if is_hardcover else "No",
+                    "Yes" if is_hk_related else "No",
                 )
 
             console.print(table)
 
         elif format == "json":
             books_list = []
-            for isbn13, title, subtitle, authors_str, year, is_hardcover in books:
+            for (
+                isbn13,
+                title,
+                subtitle,
+                authors_str,
+                year,
+                is_hardcover,
+                is_hk_related,
+            ) in books:
                 books_list.append(
                     {
                         "isbn13": isbn13,
@@ -366,6 +402,7 @@ def list(format: str, order: str, desc: bool) -> None:
                         "authors": authors_str.split("; ") if authors_str else [],
                         "year": year,
                         "is_hardcover": is_hardcover,
+                        "is_hk_related": is_hk_related,
                     }
                 )
             console.print(json.dumps(books_list, indent=4))
@@ -374,9 +411,25 @@ def list(format: str, order: str, desc: bool) -> None:
             output = io.StringIO()
             writer = csv.writer(output)
             writer.writerow(
-                ["ISBN13", "Title", "Subtitle", "Authors", "Year", "Hardcover"]
+                [
+                    "ISBN13",
+                    "Title",
+                    "Subtitle",
+                    "Authors",
+                    "Year",
+                    "Hardcover",
+                    "Hong Kong Related",
+                ]
             )
-            for isbn13, title, subtitle, authors_str, year, is_hardcover in books:
+            for (
+                isbn13,
+                title,
+                subtitle,
+                authors_str,
+                year,
+                is_hardcover,
+                is_hk_related,
+            ) in books:
                 writer.writerow(
                     [
                         isbn13,
@@ -385,6 +438,7 @@ def list(format: str, order: str, desc: bool) -> None:
                         authors_str,
                         year if year is not None else "",
                         "Yes" if is_hardcover else "No",
+                        "Yes" if is_hk_related else "No",
                     ]
                 )
             console.print(output.getvalue())
@@ -401,11 +455,33 @@ def list(format: str, order: str, desc: bool) -> None:
     "--author", "-a", type=str, multiple=True, help="Search by author (partial match)"
 )
 @click.option("--year", "-y", type=int, help="Search by publication year")
-def search(title: tuple[str, ...], author: tuple[str, ...], year: int | None) -> None:
+@click.option(
+    "--hk/--no-hk",
+    default=None,
+    help="Filter books by Hong Kong relation. Use --hk to include only HK-related books, "
+    "--no-hk to exclude them, or omit for no filter.",
+)
+@click.option(
+    "--order",
+    "-o",
+    type=click.Choice(["isbn13", "title", "year"], case_sensitive=False),
+    default="isbn13",
+    help="Order by field",
+)
+def search(
+    title: tuple[str, ...],
+    author: tuple[str, ...],
+    year: int | None,
+    hk: bool | None = None,
+    order: str = "isbn13",
+) -> None:
     init_db()
 
     # Build the query using parameter placeholders to avoid SQL injection.
-    base_query = "SELECT isbn13, title, subtitle, authors, year, is_hardcover FROM books WHERE 1=1"
+    base_query = (
+        "SELECT isbn13, title, subtitle, authors, year, is_hardcover, is_hk_related "
+        "FROM books WHERE 1=1"
+    )
     params: list[Any] = []
 
     # Add title filters
@@ -424,6 +500,16 @@ def search(title: tuple[str, ...], author: tuple[str, ...], year: int | None) ->
         base_query += " AND year = ?"
         params.append(year)
 
+    # Add Hong Kong related filter if specified
+    # Apply Hong Kong related filter based on ternary flag
+    if hk is True:
+        base_query += " AND is_hk_related = 1"
+    elif hk is False:
+        base_query += " AND is_hk_related = 0"
+
+    # Add order by clause
+    base_query += f" ORDER BY {order}"
+
     with sqlite3.connect("books.db") as conn:
         cursor = conn.cursor()
         cursor.execute(base_query, params)
@@ -433,6 +519,8 @@ def search(title: tuple[str, ...], author: tuple[str, ...], year: int | None) ->
         console.print(fmt.warning(f"No books found matching query."))
         return
 
+    console.print(fmt.success(f"Found {len(results)} book(s) matching query:"))
+
     table = rich.table.Table(show_header=True, show_lines=True)
     table.add_column("ISBN13", style="cyan", no_wrap=True)
     table.add_column("Title", style="magenta")
@@ -440,8 +528,17 @@ def search(title: tuple[str, ...], author: tuple[str, ...], year: int | None) ->
     table.add_column("Author(s)", style="yellow")
     table.add_column("Year", style="green")
     table.add_column("Hardcover", style="red")
+    table.add_column("Hong Kong Related", style="blue")
 
-    for isbn13, title, subtitle, authors_str, year, is_hardcover in results:
+    for (
+        isbn13,
+        title,
+        subtitle,
+        authors_str,
+        year,
+        is_hardcover,
+        is_hk_related,
+    ) in results:
         table.add_row(
             str(isbn13),
             title,
@@ -449,6 +546,7 @@ def search(title: tuple[str, ...], author: tuple[str, ...], year: int | None) ->
             authors_str,
             str(year) if year is not None else "",
             "Yes" if is_hardcover else "No",
+            "Yes" if is_hk_related else "No",
         )
 
     console.print(table)
@@ -465,7 +563,7 @@ def show(isbn: int) -> None:
     with sqlite3.connect("books.db") as conn:
         cursor = conn.cursor()
         cursor.execute(
-            "SELECT isbn13, title, subtitle, authors, year, is_hardcover, notes "
+            "SELECT isbn13, title, subtitle, authors, year, is_hardcover, is_hk_related, notes "
             "FROM books WHERE isbn13 = ?",
             (isbn,),
         )
